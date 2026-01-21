@@ -134,28 +134,28 @@ export const updateProfile = async (req, res) => {
     const { fullname, email, phoneNumber, bio, skills } = req.body;
     const file = req.file;
 
-    // Optional resume upload
     let cloudResponse;
     if (file) {
       const fileUri = getDataUri(file);
-      cloudResponse = await cloudinary.uploader.upload(fileUri.content);
+      cloudResponse = await cloudinary.uploader.upload(fileUri.content, {
+        resource_type: "raw", // crucial for PDF
+        folder: "resumes",
+      });
     }
 
-    // Process skills
-    let skillsArray;
-    if (skills) {
-      skillsArray = skills.split(",").map((s) => s.trim());
-    }
+    let skillsArray = skills
+      ? skills.split(",").map((s) => s.trim())
+      : undefined;
 
-    const userId = req.id; // From auth middleware
+    const userId = req.id;
     let user = await User.findById(userId);
+
     if (!user) {
       return res
         .status(404)
         .json({ message: "User not found", success: false });
     }
 
-    // Initialize profile if missing
     if (!user.profile) user.profile = {};
 
     // Update fields
@@ -163,33 +163,29 @@ export const updateProfile = async (req, res) => {
     if (email) user.email = email;
     if (phoneNumber) user.phoneNumber = phoneNumber;
     if (bio) user.profile.bio = bio;
-    if (skills) user.profile.skills = skillsArray;
+    if (skillsArray) user.profile.skills = skillsArray;
 
-    // Update resume if uploaded
     if (cloudResponse) {
-      user.profile.resume = cloudResponse.secure_url;
+      user.profile.resume = cloudResponse.secure_url; // direct link to PDF
       user.profile.resumeOriginalName = file.originalname;
     }
 
     await user.save();
 
-    // Prepare response
-    const responseUser = {
-      _id: user._id,
-      fullname: user.fullname,
-      email: user.email,
-      phoneNumber: user.phoneNumber,
-      role: user.role,
-      profile: user.profile,
-    };
-
     return res.status(200).json({
       message: "Profile updated successfully",
-      user: responseUser,
+      user: {
+        _id: user._id,
+        fullname: user.fullname,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        role: user.role,
+        profile: user.profile,
+      },
       success: true,
     });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     return res.status(500).json({ message: "Server error", success: false });
   }
 };
