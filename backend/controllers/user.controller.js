@@ -128,45 +128,53 @@ export const logout = async (req, res) => {
 /* =========================
    UPDATE PROFILE
 ========================= */
+
 export const updateProfile = async (req, res) => {
   try {
     const { fullname, email, phoneNumber, bio, skills } = req.body;
+    const file = req.file;
 
+    // Optional resume upload
     let cloudResponse;
-    if (req.file) {
-      const fileUri = getDataUri(req.file);
+    if (file) {
+      const fileUri = getDataUri(file);
       cloudResponse = await cloudinary.uploader.upload(fileUri.content);
     }
 
+    // Process skills
     let skillsArray;
     if (skills) {
       skillsArray = skills.split(",").map((s) => s.trim());
     }
 
-    const userId = req.id;
+    const userId = req.id; // From auth middleware
     let user = await User.findById(userId);
     if (!user) {
-      return res.status(400).json({
-        message: "User not found.",
-        success: false,
-      });
+      return res
+        .status(404)
+        .json({ message: "User not found", success: false });
     }
 
-    // update fields
+    // Initialize profile if missing
+    if (!user.profile) user.profile = {};
+
+    // Update fields
     if (fullname) user.fullname = fullname;
     if (email) user.email = email;
     if (phoneNumber) user.phoneNumber = phoneNumber;
     if (bio) user.profile.bio = bio;
     if (skills) user.profile.skills = skillsArray;
 
+    // Update resume if uploaded
     if (cloudResponse) {
       user.profile.resume = cloudResponse.secure_url;
-      user.profile.resumeOriginalName = req.file.originalname;
+      user.profile.resumeOriginalName = file.originalname;
     }
 
     await user.save();
 
-    user = {
+    // Prepare response
+    const responseUser = {
       _id: user._id,
       fullname: user.fullname,
       email: user.email,
@@ -176,8 +184,8 @@ export const updateProfile = async (req, res) => {
     };
 
     return res.status(200).json({
-      message: "Profile updated successfully.",
-      user,
+      message: "Profile updated successfully",
+      user: responseUser,
       success: true,
     });
   } catch (error) {
