@@ -145,7 +145,7 @@ export const login = async (req, res) => {
       .cookie("token", token, {
         maxAge: 24 * 60 * 60 * 1000,
         httpOnly: true,
-        ecure: process.env.NODE_ENV === "production", // HTTPS only
+        secure: process.env.NODE_ENV === "production", // HTTPS only
         sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax", // cross-origin
       })
       .json({
