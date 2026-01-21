@@ -5,79 +5,50 @@ import getDataUri from "../utils/datauri.js";
 import cloudinary from "../utils/cloudinary.js";
 
 /* =========================
-   REGISTER CONTROLLER
+   REGISTER
 ========================= */
 export const register = async (req, res) => {
   try {
-    // console.log("BODY:", req.body);
-    // console.log("FILE:", req.file);
-
     const { fullname, email, phoneNumber, password, role } = req.body;
 
-    if (!fullname)
-      return res
-        .status(400)
-        .json({ success: false, message: "Full name is required" });
+    if (!fullname || !email || !phoneNumber || !password || !role) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
+    }
 
-    if (!email)
-      return res
-        .status(400)
-        .json({ success: false, message: "Email is required" });
-
-    if (!phoneNumber)
-      return res
-        .status(400)
-        .json({ success: false, message: "Phone number is required" });
-
-    if (!password)
-      return res
-        .status(400)
-        .json({ success: false, message: "Password is required" });
-
-    if (!role)
-      return res
-        .status(400)
-        .json({ success: false, message: "Role is required" });
-
-    if (password.length < 6)
+    if (password.length < 6) {
       return res.status(400).json({
         success: false,
         message: "Password must be at least 6 characters",
       });
-
-    const phone = Number(phoneNumber?.trim());
-    if (!phoneNumber || isNaN(phone)) {
-      return res.status(400).json({
-        success: false,
-        message: "Phone number must be a valid number",
-      });
     }
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser)
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: "User already exists with this email",
+        message: "User already exists",
       });
+    }
 
     let profilePhoto = "";
     if (req.file) {
       const fileUri = getDataUri(req.file);
-      const cloudResponse = await cloudinary.uploader.upload(fileUri.content);
-      profilePhoto = cloudResponse.secure_url;
+      const upload = await cloudinary.uploader.upload(fileUri.content);
+      profilePhoto = upload.secure_url;
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     await User.create({
       fullname,
-      email,
-      phoneNumber: phone,
+      email: email.toLowerCase(),
+      phoneNumber,
       password: hashedPassword,
       role,
-      profile: {
-        profilePhoto,
-      },
+      profile: { profilePhoto },
     });
 
     return res.status(201).json({
@@ -86,164 +57,104 @@ export const register = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-      error: error.message,
-    });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
 /* =========================
-   LOGIN CONTROLLER
+   LOGIN (COOKIE FIXED)
 ========================= */
 export const login = async (req, res) => {
   try {
     const { email, password, role } = req.body;
 
-    if (!email)
-      return res
-        .status(400)
-        .json({ success: false, message: "Email is required" });
-
-    if (!password)
-      return res
-        .status(400)
-        .json({ success: false, message: "Password is required" });
-
-    if (!role)
-      return res
-        .status(400)
-        .json({ success: false, message: "Role is required" });
-
-    const user = await User.findOne({ email });
-    if (!user)
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user || user.role !== role) {
       return res.status(400).json({
         success: false,
-        message: "Invalid email or password",
+        message: "Invalid credentials",
       });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch)
+    if (!isMatch) {
       return res.status(400).json({
         success: false,
-        message: "Invalid email or password",
+        message: "Invalid credentials",
       });
-
-    if (user.role !== role)
-      return res.status(400).json({
-        success: false,
-        message: "Account does not exist for this role",
-      });
+    }
 
     const token = jwt.sign({ userId: user._id }, process.env.SECRET_KEY, {
       expiresIn: "1d",
     });
 
     return res
-      .status(200)
       .cookie("token", token, {
-        maxAge: 24 * 60 * 60 * 1000,
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production", // HTTPS only
-        sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax", // cross-origin
+        secure: true,
+        sameSite: "None",
+        maxAge: 24 * 60 * 60 * 1000,
       })
+      .status(200)
       .json({
         success: true,
         message: `Welcome back ${user.fullname}`,
-        user: {
-          _id: user._id,
-          fullname: user.fullname,
-          email: user.email,
-          phoneNumber: user.phoneNumber,
-          role: user.role,
-          profile: user.profile,
-        },
+        user,
       });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-      error: error.message,
-    });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
 /* =========================
-   LOGOUT CONTROLLER
+   LOGOUT
 ========================= */
 export const logout = async (req, res) => {
-  try {
-    return res.status(200).cookie("token", "", { maxAge: 0 }).json({
+  return res
+    .cookie("token", "", {
+      maxAge: 0,
+      httpOnly: true,
+      secure: true,
+      sameSite: "None",
+    })
+    .status(200)
+    .json({
       success: true,
       message: "Logged out successfully",
     });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-      error: error.message,
-    });
-  }
 };
 
 /* =========================
-   UPDATE PROFILE CONTROLLER
+   UPDATE PROFILE
 ========================= */
 export const updateProfile = async (req, res) => {
   try {
-    const { fullname, email, phoneNumber, bio, skills } = req.body;
-    const userId = req.id;
-
-    const user = await User.findById(userId);
-    if (!user)
+    const user = await User.findById(req.id);
+    if (!user) {
       return res.status(404).json({
         success: false,
         message: "User not found",
       });
+    }
+
+    const { fullname, bio, skills } = req.body;
 
     if (fullname) user.fullname = fullname;
-    if (email) user.email = email;
+    user.profile.bio = bio || user.profile.bio;
 
-    if (phoneNumber) {
-      const phone = Number(phoneNumber);
-      if (isNaN(phone))
-        return res.status(400).json({
-          success: false,
-          message: "Phone number must be numeric",
-        });
-      user.phoneNumber = phone;
-    }
-
-    // Bio update
-    user.profile.bio = bio || "";
-
-    // Skills update
     if (skills) {
-      const skillsArray = skills
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
-      user.profile.skills = skillsArray;
-    } else {
-      user.profile.skills = [];
+      user.profile.skills = skills.split(",").map((s) => s.trim());
     }
 
-    // Resume upload
     if (req.file) {
       const fileUri = getDataUri(req.file);
-
-      const cloudResponse = await cloudinary.uploader.upload(fileUri.content, {
+      const upload = await cloudinary.uploader.upload(fileUri.content, {
         resource_type: "raw",
         folder: "resumes",
-        use_filename: true,
-        unique_filename: false,
       });
 
-      user.profile.resume = cloudResponse.secure_url;
-      user.profile.resumeOriginalName = req.file.originalname;
+      user.profile.resume = upload.secure_url;
     }
 
     await user.save();
@@ -251,21 +162,10 @@ export const updateProfile = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Profile updated successfully",
-      user: {
-        _id: user._id,
-        fullname: user.fullname,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        role: user.role,
-        profile: user.profile,
-      },
+      user,
     });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-      error: error.message,
-    });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };

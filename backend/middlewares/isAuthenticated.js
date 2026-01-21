@@ -13,7 +13,7 @@ const isAuthenticated = (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.SECRET_KEY);
 
-    req.id = decoded.userId; // or req.userId
+    req.id = decoded.userId;
     next();
   } catch (error) {
     console.error("Auth error:", error.message);
