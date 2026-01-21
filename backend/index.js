@@ -21,9 +21,9 @@ app.use(cookieParser());
 const corsOptions = {
   origin: [
     "http://localhost:5173",
-    "https://job-portal-eight-psi-46.vercel.app",
-    "https://job-portal-git-main-rajats-projects-149ec79a.vercel.app",
-    "https://job-portal-ertt361hc-rajats-projects-149ec79a.vercel.app",
+    "https://naukri-portal-plum.vercel.app",
+    "https://naukri-portal-git-main-rajats-projects-149ec79a.vercel.app",
+    "https://naukri-portal-93rhkd80d-rajats-projects-149ec79a.vercel.app",
   ],
   credentials: true,
 };
