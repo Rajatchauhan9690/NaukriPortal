@@ -8,6 +8,7 @@ import { useDispatch, useSelector } from "react-redux";
 import axios from "axios";
 import { USER_API_END_POINT } from "@/utils/constant";
 import { setUser } from "@/redux/authSlice";
+import { clearJobs } from "@/redux/jobSlice"; // ✅ import clearJobs
 import { toast } from "sonner";
 
 const Navbar = () => {
@@ -21,15 +22,17 @@ const Navbar = () => {
         withCredentials: true,
       });
       if (res.data.success) {
-        dispatch(setUser(null));
+        dispatch(setUser(null)); // clear user
+        dispatch(clearJobs()); // ✅ clear all jobs
         navigate("/");
         toast.success(res.data.message);
       }
     } catch (error) {
       console.log(error);
-      toast.error(error.response.data.message);
+      toast.error(error.response?.data?.message || "Logout failed");
     }
   };
+
   return (
     <div className="bg-white">
       <div className="flex items-center justify-between mx-auto max-w-7xl h-16">
@@ -63,6 +66,7 @@ const Navbar = () => {
               </>
             )}
           </ul>
+
           {!user ? (
             <div className="flex items-center gap-2">
               <Link to="/login">
@@ -105,12 +109,10 @@ const Navbar = () => {
                       <div className="flex w-fit items-center gap-2 cursor-pointer">
                         <User2 />
                         <Button variant="link">
-                          {" "}
                           <Link to="/profile">View Profile</Link>
                         </Button>
                       </div>
                     )}
-
                     <div className="flex w-fit items-center gap-2 cursor-pointer">
                       <LogOut />
                       <Button onClick={logoutHandler} variant="link">

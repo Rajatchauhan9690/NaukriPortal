@@ -34,7 +34,7 @@ const FilterCard = () => {
       <hr className="mt-3" />
       <RadioGroup value={selectedValue} onValueChange={changeHandler}>
         {fitlerData.map((data, index) => (
-          <div key={data.id}>
+          <div key={index}>
             <h1 className="font-bold text-lg">{data.fitlerType}</h1>
             {data.array.map((item, idx) => {
               const itemId = `id${index}-${idx}`;
